@@ -171,6 +171,13 @@
                                 <div class="w-full bg-gray-200 rounded-full h-2">
                                     <div id="monthlyBar" class="bg-green-600 h-2 rounded-full" style="width: 0%"></div>
                                 </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">总计</span>
+                                    <span id="totalRate" class="font-medium text-purple-600">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div id="totalBar" class="bg-purple-600 h-2 rounded-full" style="width: 0%"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -180,7 +187,9 @@
                     </div>
                     <div class="bg-white p-6 rounded-lg shadow">
                         <h3 class="text-lg font-medium text-gray-900 mb-4">打卡热力图</h3>
-                        <div id="heatmap" class="overflow-x-auto"></div>
+                        <div class="overflow-x-auto">
+                            <canvas id="heatmapCanvas" class="w-full"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -311,8 +320,26 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">提醒时间</label>
-                    <input type="time" id="habitReminder" class="w-full px-3 py-2 border rounded-md">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">图标</label>
+                    <div id="iconSelector" class="grid grid-cols-8 gap-2 p-2 border rounded-md">
+                        <button type="button" data-icon="🏃" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">🏃</button>
+                        <button type="button" data-icon="📚" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">📚</button>
+                        <button type="button" data-icon="💪" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">💪</button>
+                        <button type="button" data-icon="🧘" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">🧘</button>
+                        <button type="button" data-icon="🚶" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">🚶</button>
+                        <button type="button" data-icon="💧" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">💧</button>
+                        <button type="button" data-icon="🥗" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">🥗</button>
+                        <button type="button" data-icon="💤" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">💤</button>
+                        <button type="button" data-icon="✍️" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">✍️</button>
+                        <button type="button" data-icon="🎨" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">🎨</button>
+                        <button type="button" data-icon="🎵" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">🎵</button>
+                        <button type="button" data-icon="💻" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">💻</button>
+                        <button type="button" data-icon="💰" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">💰</button>
+                        <button type="button" data-icon="📝" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">📝</button>
+                        <button type="button" data-icon="🌱" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">🌱</button>
+                        <button type="button" data-icon="⭐" class="icon-btn p-2 hover:bg-gray-100 rounded text-xl">⭐</button>
+                    </div>
+                    <input type="hidden" id="habitIcon" value="🌱">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">颜色</label>
@@ -495,7 +522,7 @@
             container.innerHTML = habits.map(h => `
                 <div class="bg-white p-4 rounded-lg shadow flex items-center justify-between">
                     <div class="flex items-center space-x-4">
-                        <div class="habit-dot" style="background-color: ${h.habit.color}"></div>
+                        <div class="text-2xl">${h.habit.icon || '🌱'}</div>
                         <div>
                             <h4 class="font-medium text-gray-900">${h.habit.name}</h4>
                             <p class="text-sm text-gray-500">${h.habit.target}</p>
@@ -543,7 +570,7 @@
                 <div class="bg-white p-4 rounded-lg shadow">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-4">
-                            <div class="habit-dot" style="background-color: ${h.color}"></div>
+                            <div class="text-2xl">${h.icon || '🌱'}</div>
                             <div>
                                 <h4 class="font-medium text-gray-900">${h.name}</h4>
                                 <p class="text-sm text-gray-500">${h.target} · ${h.frequency} · ${h.start_date}</p>
@@ -579,6 +606,10 @@
             document.getElementById('habitModal').classList.remove('hidden');
             document.getElementById('habitModalTitle').textContent = habit ? '编辑习惯' : '新建习惯';
             
+            document.querySelectorAll('.icon-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-100', 'border', 'border-indigo-500');
+            });
+            
             if (habit) {
                 document.getElementById('habitId').value = habit.id;
                 document.getElementById('habitName').value = habit.name;
@@ -587,17 +618,40 @@
                 document.getElementById('habitReminder').value = habit.reminder_time || '';
                 document.getElementById('habitColor').value = habit.color;
                 document.getElementById('habitStartDate').value = habit.start_date;
+                document.getElementById('habitIcon').value = habit.icon || '🌱';
+                
+                if (habit.icon) {
+                    const selectedBtn = document.querySelector(`.icon-btn[data-icon="${habit.icon}"]`);
+                    if (selectedBtn) {
+                        selectedBtn.classList.add('bg-indigo-100', 'border', 'border-indigo-500');
+                    }
+                }
             } else {
                 document.getElementById('habitForm').reset();
                 document.getElementById('habitId').value = '';
                 document.getElementById('habitStartDate').value = new Date().toISOString().split('T')[0];
                 document.getElementById('habitColor').value = '#4CAF50';
+                document.getElementById('habitIcon').value = '🌱';
+                const defaultBtn = document.querySelector('.icon-btn[data-icon="🌱"]');
+                if (defaultBtn) {
+                    defaultBtn.classList.add('bg-indigo-100', 'border', 'border-indigo-500');
+                }
             }
         }
 
         function hideHabitModal() {
             document.getElementById('habitModal').classList.add('hidden');
         }
+
+        document.querySelectorAll('.icon-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.icon-btn').forEach(b => {
+                    b.classList.remove('bg-indigo-100', 'border', 'border-indigo-500');
+                });
+                btn.classList.add('bg-indigo-100', 'border', 'border-indigo-500');
+                document.getElementById('habitIcon').value = btn.dataset.icon;
+            });
+        });
 
         document.getElementById('habitForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -607,6 +661,7 @@
                 target: document.getElementById('habitTarget').value,
                 frequency: document.getElementById('habitFrequency').value,
                 reminder_time: document.getElementById('habitReminder').value || null,
+                icon: document.getElementById('habitIcon').value,
                 color: document.getElementById('habitColor').value,
                 start_date: document.getElementById('habitStartDate').value
             };
@@ -727,6 +782,8 @@
             document.getElementById('weeklyBar').style.width = completion.weekly + '%';
             document.getElementById('monthlyRate').textContent = completion.monthly + '%';
             document.getElementById('monthlyBar').style.width = completion.monthly + '%';
+            document.getElementById('totalRate').textContent = completion.total + '%';
+            document.getElementById('totalBar').style.width = completion.total + '%';
 
             const trendData = await api('/statistics/trend?days=30');
             const ctx = document.getElementById('trendChart').getContext('2d');
@@ -736,8 +793,8 @@
                 data: {
                     labels: trendData.map(d => d.date.slice(5)),
                     datasets: [{
-                        label: '打卡数',
-                        data: trendData.map(d => d.count),
+                        label: '完成率 (%)',
+                        data: trendData.map(d => d.rate),
                         borderColor: '#4F46E5',
                         backgroundColor: 'rgba(79, 70, 229, 0.1)',
                         fill: true,
@@ -747,50 +804,71 @@
                 options: {
                     responsive: true,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
+                    scales: { y: { beginAtZero: true, max: 100 } }
                 }
             });
 
             const heatmapData = await api('/statistics/heatmap');
-            renderHeatmap(heatmapData);
+            renderHeatmapCanvas(heatmapData);
         }
 
-        function renderHeatmap(data) {
-            const container = document.getElementById('heatmap');
+        function renderHeatmapCanvas(data) {
+            const canvas = document.getElementById('heatmapCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            const cellSize = 12;
+            const cellGap = 2;
+            const weekCount = 53;
+            const dayCount = 7;
+            const labelHeight = 30;
+            
+            canvas.width = weekCount * (cellSize + cellGap) + 60;
+            canvas.height = dayCount * (cellSize + cellGap) + labelHeight + 20;
+            
+            const colors = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+            const weekDays = ['', '一', '', '三', '', '五', ''];
+            
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '11px sans-serif';
+            weekDays.forEach((d, i) => {
+                if (d) ctx.fillText(d, 5, i * (cellSize + cellGap) + cellSize);
+            });
+            
             const today = new Date();
             const startDate = new Date(today);
             startDate.setDate(today.getDate() - 364);
             
-            const weekDays = ['', '一', '', '三', '', '五', ''];
-            let html = '<div class="flex"><div class="flex flex-col text-xs text-gray-500 pr-2">';
-            weekDays.forEach(d => html += `<div class="h-3 mb-1">${d}</div>`);
-            html += '</div><div class="flex">';
-            
             let currentDate = new Date(startDate);
-            let weekHtml = '';
             for (let week = 0; week < 53; week++) {
-                weekHtml = '<div class="flex flex-col space-y-1">';
                 for (let day = 0; day < 7; day++) {
                     if (currentDate > today) break;
                     const dateStr = currentDate.toISOString().split('T')[0];
                     const count = data[dateStr] || 0;
                     const level = Math.min(count, 4);
-                    weekHtml += `<div class="heatmap-cell heatmap-level-${level}" title="${dateStr}: ${count}次打卡"></div>`;
+                    
+                    const x = 50 + week * (cellSize + cellGap);
+                    const y = day * (cellSize + cellGap);
+                    
+                    ctx.fillStyle = colors[level];
+                    ctx.fillRect(x, y, cellSize, cellSize);
+                    
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
-                weekHtml += '</div>';
-                html += weekHtml;
             }
             
-            html += '</div></div>';
-            html += '<div class="flex items-center justify-end mt-4 space-x-2 text-xs text-gray-500">';
-            html += '<span>少</span>';
+            const legendX = canvas.width - 150;
+            const legendY = canvas.height - 20;
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '11px sans-serif';
+            ctx.fillText('少', legendX - 20, legendY + 10);
+            
             for (let i = 0; i <= 4; i++) {
-                html += `<div class="heatmap-cell heatmap-level-${i}"></div>`;
+                ctx.fillStyle = colors[i];
+                ctx.fillRect(legendX + i * (cellSize + 5), legendY, cellSize, cellSize);
             }
-            html += '<span>多</span></div>';
             
-            container.innerHTML = html;
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('多', legendX + 5 * (cellSize + 5), legendY + 10);
         }
 
         function initDateSelects() {

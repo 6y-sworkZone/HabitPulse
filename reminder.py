@@ -1,9 +1,30 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
-from database import SessionLocal, Habit, User, ReminderLog
+from database import SessionLocal, Habit, User, ReminderLog, Checkin
 
 scheduler = BackgroundScheduler()
+
+def cleanup_deleted_users():
+    db = SessionLocal()
+    try:
+        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        deleted_users = db.query(User).filter(
+            User.is_deleted == True,
+            User.deleted_at <= cutoff_date
+        ).all()
+        
+        for user in deleted_users:
+            db.query(Checkin).filter(Checkin.user_id == user.id).delete()
+            db.query(ReminderLog).filter(ReminderLog.user_id == user.id).delete()
+            db.query(Habit).filter(Habit.user_id == user.id).delete()
+            db.delete(user)
+        
+        db.commit()
+        if deleted_users:
+            print(f"Cleaned up {len(deleted_users)} deleted accounts")
+    finally:
+        db.close()
 
 def send_webhook_reminder(user, habit):
     if not user.webhook_url:
@@ -63,6 +84,7 @@ def check_reminders():
 
 def start_scheduler():
     scheduler.add_job(check_reminders, 'cron', minute='*')
+    scheduler.add_job(cleanup_deleted_users, 'cron', hour=2, minute=0)
     scheduler.start()
     print("Reminder scheduler started")
 

@@ -12,11 +12,33 @@ import json
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+def register_chinese_font():
+    font_paths = [
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/simsun.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/Library/Fonts/Arial Unicode.ttf"
+    ]
+    
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont('ChineseFont', path))
+                return True
+            except:
+                continue
+    return False
+
+chinese_font_available = register_chinese_font()
 
 from database import get_db, init_db, User, Habit, Checkin, ReminderLog, HabitGroup, GroupMember, GroupMessage
 from auth import (
     get_password_hash, authenticate_user, create_access_token,
-    ACCESS_TOKEN_EXPIRE_MINUTES, Token, get_current_user
+    ACCESS_TOKEN_EXPIRE_MINUTES, Token, get_current_user, verify_password
 )
 from reminder import start_scheduler, shutdown_scheduler
 from pydantic import BaseModel, EmailStr
@@ -174,6 +196,15 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 async def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     user = authenticate_user(db, username, password)
     if not user:
+        db_user = db.query(User).filter(User.username == username).first()
+        if db_user and db_user.is_deleted:
+            if verify_password(password, db_user.hashed_password):
+                db_user.is_deleted = False
+                db_user.deleted_at = None
+                db.commit()
+                db.refresh(db_user)
+                user = db_user
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -184,6 +215,27 @@ async def login(username: str = Form(...), password: str = Form(...), db: Sessio
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/users/me/recover")
+def recover_user(
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    db_user = db.query(User).filter(User.username == username).first()
+    if not db_user or not verify_password(password, db_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+    if not db_user.is_deleted:
+        return {"message": "Account is not deleted"}
+    
+    db_user.is_deleted = False
+    db_user.deleted_at = None
+    db.commit()
+    return {"message": "Account recovered successfully"}
 
 
 @app.get("/users/me", response_model=UserResponse)
@@ -589,7 +641,9 @@ def get_trend_data(
             Checkin.habit_id.in_(habit_ids),
             Checkin.checkin_date == d
         ).count()
-        result.append({"date": str(d), "count": count, "total": len(habits)})
+        total = len(habits)
+        completion_rate = round((count / total * 100) if total > 0 else 0, 1)
+        result.append({"date": str(d), "count": count, "total": total, "rate": completion_rate})
     
     return result
 
@@ -729,30 +783,32 @@ def export_pdf_report(
     c = canvas.Canvas(filepath, pagesize=A4)
     width, height = A4
     
-    c.setFont("Helvetica-Bold", 20)
-    c.drawString(50, height - 50, f"Habit Pulse Monthly Report - {year}/{month}")
+    font_name = "ChineseFont" if chinese_font_available else "Helvetica"
     
-    c.setFont("Helvetica", 12)
-    c.drawString(50, height - 80, f"User: {current_user.nickname or current_user.username}")
-    c.drawString(50, height - 100, f"Period: {start_date} to {end_date}")
+    c.setFont(font_name, 20)
+    c.drawString(50, height - 50, f"Habit Pulse 月度报告 - {year}年{month}月")
+    
+    c.setFont(font_name, 12)
+    c.drawString(50, height - 80, f"用户: {current_user.nickname or current_user.username}")
+    c.drawString(50, height - 100, f"期间: {start_date} 至 {end_date}")
     
     y = height - 150
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y, "Habits:")
+    c.setFont(font_name, 14)
+    c.drawString(50, y, "习惯列表:")
     y -= 25
     
-    c.setFont("Helvetica", 11)
+    c.setFont(font_name, 11)
     for habit in habits:
         habit_checkins = [c for c in checkins if c.habit_id == habit.id]
         c.setFillColor(colors.HexColor(habit.color))
         c.circle(60, y, 5, fill=1)
         c.setFillColor(colors.black)
-        c.drawString(75, y - 3, f"{habit.name}: {len(habit_checkins)} checkins")
+        c.drawString(75, y - 3, f"{habit.name}: {len(habit_checkins)} 次打卡")
         y -= 20
     
     y -= 20
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y, "Monthly Summary:")
+    c.setFont(font_name, 14)
+    c.drawString(50, y, "月度总结:")
     y -= 25
     
     total_days = (end_date - start_date).days + 1
@@ -760,12 +816,12 @@ def export_pdf_report(
     total_actual = len(checkins)
     completion_rate = (total_actual / total_expected * 100) if total_expected > 0 else 0
     
-    c.setFont("Helvetica", 11)
-    c.drawString(50, y, f"Total habits: {len(habits)}")
+    c.setFont(font_name, 11)
+    c.drawString(50, y, f"习惯总数: {len(habits)}")
     y -= 20
-    c.drawString(50, y, f"Total checkins: {total_actual}")
+    c.drawString(50, y, f"打卡总数: {total_actual}")
     y -= 20
-    c.drawString(50, y, f"Completion rate: {completion_rate:.1f}%")
+    c.drawString(50, y, f"完成率: {completion_rate:.1f}%")
     
     c.save()
     return FileResponse(filepath, filename=filename)
