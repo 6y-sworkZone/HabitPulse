@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabitPulse - 习惯追踪</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .habit-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .calendar-day { min-height: 80px; }
+        .heatmap-cell { width: 12px; height: 12px; border-radius: 2px; }
+        .heatmap-level-0 { background: #ebedf0; }
+        .heatmap-level-1 { background: #9be9a8; }
+        .heatmap-level-2 { background: #40c463; }
+        .heatmap-level-3 { background: #30a14e; }
+        .heatmap-level-4 { background: #216e39; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app">
+        <!-- 登录/注册页面 -->
+        <div id="authPage" class="page active">
+            <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-md w-full space-y-8">
+                    <div>
+                        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                            🌱 HabitPulse
+                        </h2>
+                        <p class="mt-2 text-center text-sm text-gray-600">养成好习惯，每一天都重要</p>
+                    </div>
+                    <div class="bg-white shadow-md rounded-lg p-6">
+                        <div class="flex mb-4">
+                            <button onclick="showAuthForm('login')" id="loginTab" class="flex-1 py-2 text-center font-medium text-indigo-600 border-b-2 border-indigo-600">登录</button>
+                            <button onclick="showAuthForm('register')" id="registerTab" class="flex-1 py-2 text-center font-medium text-gray-500 hover:text-gray-700">注册</button>
+                        </div>
+                        
+                        <form id="loginForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">用户名</label>
+                                <input type="text" id="loginUsername" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">密码</label>
+                                <input type="password" id="loginPassword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                登录
+                            </button>
+                        </form>
+                        
+                        <form id="registerForm" class="space-y-4 hidden">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">用户名</label>
+                                <input type="text" id="registerUsername" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">邮箱</label>
+                                <input type="email" id="registerEmail" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">密码</label>
+                                <input type="password" id="registerPassword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                注册
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主应用页面 -->
+        <div id="mainPage" class="page">
+            <nav class="bg-white shadow-sm">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between h-16">
+                        <div class="flex items-center">
+                            <span class="text-xl font-bold text-indigo-600">🌱 HabitPulse</span>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span id="navUsername" class="text-gray-700"></span>
+                            <button onclick="logout()" class="text-gray-500 hover:text-gray-700">退出</button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="bg-white border-b">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex space-x-8">
+                        <button onclick="showSection('today')" class="nav-btn py-4 px-1 border-b-2 border-indigo-500 font-medium text-indigo-600" data-section="today">今日打卡</button>
+                        <button onclick="showSection('habits')" class="nav-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-section="habits">习惯管理</button>
+                        <button onclick="showSection('calendar')" class="nav-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-section="calendar">日历视图</button>
+                        <button onclick="showSection('statistics')" class="nav-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-section="statistics">统计面板</button>
+                        <button onclick="showSection('data')" class="nav-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-section="data">数据管理</button>
+                        <button onclick="showSection('groups')" class="nav-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-section="groups">小组</button>
+                        <button onclick="showSection('profile')" class="nav-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-section="profile">个人资料</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <!-- 今日打卡 -->
+                <div id="todaySection" class="section">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">今日打卡</h2>
+                    <div id="todayHabits" class="space-y-4"></div>
+                </div>
+
+                <!-- 习惯管理 -->
+                <div id="habitsSection" class="section hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900">习惯管理</h2>
+                        <button onclick="showHabitModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">+ 新建习惯</button>
+                    </div>
+                    <div class="flex space-x-4 mb-4">
+                        <button onclick="toggleArchived(false)" id="activeBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-md">进行中</button>
+                        <button onclick="toggleArchived(true)" id="archivedBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md">已归档</button>
+                    </div>
+                    <div id="habitsList" class="space-y-4"></div>
+                </div>
+
+                <!-- 日历视图 -->
+                <div id="calendarSection" class="section hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900">日历视图</h2>
+                        <div class="flex space-x-2">
+                            <button onclick="changeMonth(-1)" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">←</button>
+                            <span id="currentMonth" class="px-4 py-1 font-medium"></span>
+                            <button onclick="changeMonth(1)" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">→</button>
+                        </div>
+                    </div>
+                    <div id="calendar" class="bg-white rounded-lg shadow overflow-hidden"></div>
+                </div>
+
+                <!-- 统计面板 -->
+                <div id="statisticsSection" class="section hidden">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">统计面板</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">连续打卡</h3>
+                            <div class="flex justify-around">
+                                <div class="text-center">
+                                    <div id="currentStreak" class="text-4xl font-bold text-indigo-600">0</div>
+                                    <div class="text-sm text-gray-500">当前连续</div>
+                                </div>
+                                <div class="text-center">
+                                    <div id="longestStreak" class="text-4xl font-bold text-green-600">0</div>
+                                    <div class="text-sm text-gray-500">最长连续</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">完成率</h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">本周</span>
+                                    <span id="weeklyRate" class="font-medium text-indigo-600">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div id="weeklyBar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">本月</span>
+                                    <span id="monthlyRate" class="font-medium text-green-600">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div id="monthlyBar" class="bg-green-600 h-2 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow mb-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">完成趋势</h3>
+                        <canvas id="trendChart" height="100"></canvas>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">打卡热力图</h3>
+                        <div id="heatmap" class="overflow-x-auto"></div>
+                    </div>
+                </div>
+
+                <!-- 数据管理 -->
+                <div id="dataSection" class="section hidden">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">数据管理</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">导出数据</h3>
+                            <p class="text-gray-600 mb-4">导出所有习惯和打卡记录为 JSON 文件</p>
+                            <button onclick="exportData()" class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">导出 JSON</button>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">导入数据</h3>
+                            <p class="text-gray-600 mb-4">从 JSON 文件导入习惯和打卡记录</p>
+                            <input type="file" id="importFile" accept=".json" class="hidden">
+                            <button onclick="document.getElementById('importFile').click()" class="w-full bg-green-600 text-white py-2 rounded-md hover:bg-green-700">导入 JSON</button>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">月度报告</h3>
+                            <p class="text-gray-600 mb-4">导出月度打卡报告为 PDF 文件</p>
+                            <div class="flex space-x-2">
+                                <select id="reportYear" class="flex-1 px-3 py-2 border rounded-md"></select>
+                                <select id="reportMonth" class="flex-1 px-3 py-2 border rounded-md"></select>
+                            </div>
+                            <button onclick="exportPDF()" class="w-full mt-4 bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700">导出 PDF</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 小组 -->
+                <div id="groupsSection" class="section hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900">习惯小组</h2>
+                        <button onclick="showGroupModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">+ 创建小组</button>
+                    </div>
+                    <div id="groupsList" class="space-y-4 mb-8"></div>
+                    <div id="groupDetail" class="hidden">
+                        <div class="bg-white p-6 rounded-lg shadow mb-6">
+                            <h3 id="groupName" class="text-xl font-bold text-gray-900"></h3>
+                            <p id="groupDesc" class="text-gray-600 mt-2"></p>
+                            <div class="mt-4 flex space-x-4">
+                                <button onclick="showInviteModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">邀请成员</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white p-6 rounded-lg shadow">
+                                <h4 class="text-lg font-medium text-gray-900 mb-4">本周排行榜</h4>
+                                <div id="leaderboard" class="space-y-2"></div>
+                            </div>
+                            <div class="bg-white p-6 rounded-lg shadow">
+                                <h4 class="text-lg font-medium text-gray-900 mb-4">留言板</h4>
+                                <div id="messageBoard" class="space-y-3 max-h-80 overflow-y-auto mb-4"></div>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="messageInput" class="flex-1 px-3 py-2 border rounded-md" placeholder="输入留言...">
+                                    <button onclick="postMessage()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">发送</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 个人资料 -->
+                <div id="profileSection" class="section hidden">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">个人资料</h2>
+                    <div class="bg-white p-6 rounded-lg shadow max-w-xl">
+                        <div class="flex items-center space-x-6 mb-6">
+                            <div class="relative">
+                                <img id="avatarPreview" src="" class="w-24 h-24 rounded-full object-cover bg-gray-200">
+                                <input type="file" id="avatarInput" accept="image/*" class="hidden">
+                                <button onclick="document.getElementById('avatarInput').click()" class="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full text-sm">📷</button>
+                            </div>
+                            <div>
+                                <h3 id="profileUsername" class="text-xl font-bold text-gray-900"></h3>
+                                <p id="profileEmail" class="text-gray-600"></p>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">昵称</label>
+                                <input type="text" id="profileNickname" class="w-full px-3 py-2 border rounded-md">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">个人简介</label>
+                                <textarea id="profileBio" rows="3" class="w-full px-3 py-2 border rounded-md"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Webhook URL (提醒通知)</label>
+                                <input type="text" id="profileWebhook" class="w-full px-3 py-2 border rounded-md" placeholder="钉钉/飞书/自定义 Webhook 地址">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Webhook 类型</label>
+                                <select id="profileWebhookType" class="w-full px-3 py-2 border rounded-md">
+                                    <option value="custom">自定义</option>
+                                    <option value="dingtalk">钉钉</option>
+                                    <option value="feishu">飞书</option>
+                                </select>
+                            </div>
+                            <button onclick="updateProfile()" class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">保存修改</button>
+                            <button onclick="confirmDeleteAccount()" class="w-full bg-red-600 text-white py-2 rounded-md hover:bg-red-700">注销账户（30天内可恢复）</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 习惯弹窗 -->
+    <div id="habitModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 id="habitModalTitle" class="text-xl font-bold text-gray-900 mb-4">新建习惯</h3>
+            <form id="habitForm" class="space-y-4">
+                <input type="hidden" id="habitId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">习惯名称</label>
+                    <input type="text" id="habitName" required class="w-full px-3 py-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">目标</label>
+                    <input type="text" id="habitTarget" class="w-full px-3 py-2 border rounded-md" placeholder="例如：每天阅读30分钟">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">频率</label>
+                    <select id="habitFrequency" class="w-full px-3 py-2 border rounded-md">
+                        <option value="daily">每天</option>
+                        <option value="weekly">每周</option>
+                        <option value="monthly">每月</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">提醒时间</label>
+                    <input type="time" id="habitReminder" class="w-full px-3 py-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">颜色</label>
+                    <input type="color" id="habitColor" value="#4CAF50" class="w-full h-10 rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">开始日期</label>
+                    <input type="date" id="habitStartDate" required class="w-full px-3 py-2 border rounded-md">
+                </div>
+                <div class="flex space-x-3">
+                    <button type="button" onclick="hideHabitModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300">取消</button>
+                    <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 小组弹窗 -->
+    <div id="groupModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">创建小组</h3>
+            <form id="groupForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">小组名称</label>
+                    <input type="text" id="groupNameInput" required class="w-full px-3 py-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+                    <textarea id="groupDescInput" rows="3" class="w-full px-3 py-2 border rounded-md"></textarea>
+                </div>
+                <div class="flex space-x-3">
+                    <button type="button" onclick="hideGroupModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300">取消</button>
+                    <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 邀请弹窗 -->
+    <div id="inviteModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">邀请成员</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+                    <input type="text" id="inviteUsername" class="w-full px-3 py-2 border rounded-md">
+                </div>
+                <div class="flex space-x-3">
+                    <button type="button" onclick="hideInviteModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300">取消</button>
+                    <button type="button" onclick="inviteMember()" class="flex-1 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">邀请</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 打卡备注弹窗 -->
+    <div id="noteModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">打卡备注</h3>
+            <div class="space-y-4">
+                <input type="hidden" id="noteHabitId">
+                <input type="hidden" id="noteDate">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">备注（可选）</label>
+                    <textarea id="noteContent" rows="3" class="w-full px-3 py-2 border rounded-md"></textarea>
+                </div>
+                <div class="flex space-x-3">
+                    <button type="button" onclick="hideNoteModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300">取消</button>
+                    <button type="button" onclick="submitCheckin()" class="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700">确认打卡</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token');
+        let currentUser = null;
+        let currentMonth = new Date();
+        let currentGroupId = null;
+        let showArchived = false;
+
+        function api(url, options = {}) {
+            const headers = { 'Authorization': `Bearer ${token}`, ...options.headers };
+            if (options.body && !(options.body instanceof FormData)) {
+                headers['Content-Type'] = 'application/json';
+            }
+            return fetch(url, { ...options, headers }).then(r => {
+                if (r.status === 401) { logout(); throw new Error('Unauthorized'); }
+                return r.json();
+            });
+        }
+
+        function showAuthForm(type) {
+            document.getElementById('loginForm').classList.toggle('hidden', type !== 'login');
+            document.getElementById('registerForm').classList.toggle('hidden', type !== 'register');
+            document.getElementById('loginTab').classList.toggle('border-indigo-600', type === 'login');
+            document.getElementById('loginTab').classList.toggle('text-indigo-600', type === 'login');
+            document.getElementById('registerTab').classList.toggle('border-indigo-600', type === 'register');
+            document.getElementById('registerTab').classList.toggle('text-indigo-600', type === 'register');
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('username', document.getElementById('loginUsername').value);
+            formData.append('password', document.getElementById('loginPassword').value);
+            
+            const res = await fetch('/login', { method: 'POST', body: formData }).then(r => r.json());
+            if (res.access_token) {
+                localStorage.setItem('token', res.access_token);
+                token = res.access_token;
+                await loadUser();
+                showPage('mainPage');
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: document.getElementById('registerUsername').value,
+                    email: document.getElementById('registerEmail').value,
+                    password: document.getElementById('registerPassword').value
+                })
+            }).then(r => r.json());
+            if (res.id) {
+                alert('注册成功，请登录');
+                showAuthForm('login');
+            }
+        });
+
+        async function loadUser() {
+            currentUser = await api('/users/me');
+            document.getElementById('navUsername').textContent = currentUser.nickname || currentUser.username;
+            document.getElementById('profileUsername').textContent = currentUser.nickname || currentUser.username;
+            document.getElementById('profileEmail').textContent = currentUser.email;
+            document.getElementById('profileNickname').value = currentUser.nickname || '';
+            document.getElementById('profileBio').value = currentUser.bio || '';
+            document.getElementById('profileWebhook').value = currentUser.webhook_url || '';
+            document.getElementById('profileWebhookType').value = currentUser.webhook_type || 'custom';
+            
+            if (currentUser.avatar && currentUser.avatar !== 'default.png') {
+                document.getElementById('avatarPreview').src = `/static/avatars/${currentUser.avatar}`;
+            }
+            
+            loadTodayHabits();
+            loadHabits();
+            loadCalendar();
+            loadStatistics();
+            loadGroups();
+            initDateSelects();
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            token = null;
+            showPage('authPage');
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(sectionId + 'Section').classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                b.classList.toggle('border-indigo-500', b.dataset.section === sectionId);
+                b.classList.toggle('text-indigo-600', b.dataset.section === sectionId);
+                b.classList.toggle('border-transparent', b.dataset.section !== sectionId);
+            });
+        }
+
+        async function loadTodayHabits() {
+            const habits = await api('/checkins/today');
+            const container = document.getElementById('todayHabits');
+            container.innerHTML = habits.map(h => `
+                <div class="bg-white p-4 rounded-lg shadow flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="habit-dot" style="background-color: ${h.habit.color}"></div>
+                        <div>
+                            <h4 class="font-medium text-gray-900">${h.habit.name}</h4>
+                            <p class="text-sm text-gray-500">${h.habit.target}</p>
+                        </div>
+                    </div>
+                    <button onclick="checkin(${h.habit.id}, '${new Date().toISOString().split('T')[0]}')" 
+                        class="px-4 py-2 rounded-md ${h.checked ? 'bg-green-100 text-green-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}">
+                        ${h.checked ? '✓ 已完成' : '打卡'}
+                    </button>
+                </div>
+            `).join('') || '<p class="text-gray-500">暂无习惯，快去创建吧！</p>';
+        }
+
+        async function checkin(habitId, date) {
+            document.getElementById('noteHabitId').value = habitId;
+            document.getElementById('noteDate').value = date;
+            document.getElementById('noteModal').classList.remove('hidden');
+        }
+
+        async function submitCheckin() {
+            const habitId = document.getElementById('noteHabitId').value;
+            const date = document.getElementById('noteDate').value;
+            const note = document.getElementById('noteContent').value;
+            
+            await api('/checkins', {
+                method: 'POST',
+                body: JSON.stringify({ habit_id: parseInt(habitId), checkin_date: date, note })
+            });
+            
+            hideNoteModal();
+            loadTodayHabits();
+            loadCalendar();
+            loadStatistics();
+        }
+
+        function hideNoteModal() {
+            document.getElementById('noteModal').classList.add('hidden');
+            document.getElementById('noteContent').value = '';
+        }
+
+        async function loadHabits() {
+            const habits = await api(`/habits?include_archived=${showArchived}`);
+            const container = document.getElementById('habitsList');
+            container.innerHTML = habits.map(h => `
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="habit-dot" style="background-color: ${h.color}"></div>
+                            <div>
+                                <h4 class="font-medium text-gray-900">${h.name}</h4>
+                                <p class="text-sm text-gray-500">${h.target} · ${h.frequency} · ${h.start_date}</p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="editHabit(${h.id})" class="text-indigo-600 hover:text-indigo-800">编辑</button>
+                            ${h.is_archived 
+                                ? `<button onclick="unarchiveHabit(${h.id})" class="text-green-600 hover:text-green-800">恢复</button>`
+                                : `<button onclick="archiveHabit(${h.id})" class="text-yellow-600 hover:text-yellow-800">归档</button>`
+                            }
+                            <button onclick="deleteHabit(${h.id})" class="text-red-600 hover:text-red-800">删除</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-gray-500">暂无习惯</p>';
+        }
+
+        function toggleArchived(archived) {
+            showArchived = archived;
+            document.getElementById('activeBtn').classList.toggle('bg-indigo-600', !archived);
+            document.getElementById('activeBtn').classList.toggle('text-white', !archived);
+            document.getElementById('activeBtn').classList.toggle('bg-gray-200', archived);
+            document.getElementById('activeBtn').classList.toggle('text-gray-700', archived);
+            document.getElementById('archivedBtn').classList.toggle('bg-indigo-600', archived);
+            document.getElementById('archivedBtn').classList.toggle('text-white', archived);
+            document.getElementById('archivedBtn').classList.toggle('bg-gray-200', !archived);
+            document.getElementById('archivedBtn').classList.toggle('text-gray-700', !archived);
+            loadHabits();
+        }
+
+        function showHabitModal(habit = null) {
+            document.getElementById('habitModal').classList.remove('hidden');
+            document.getElementById('habitModalTitle').textContent = habit ? '编辑习惯' : '新建习惯';
+            
+            if (habit) {
+                document.getElementById('habitId').value = habit.id;
+                document.getElementById('habitName').value = habit.name;
+                document.getElementById('habitTarget').value = habit.target;
+                document.getElementById('habitFrequency').value = habit.frequency;
+                document.getElementById('habitReminder').value = habit.reminder_time || '';
+                document.getElementById('habitColor').value = habit.color;
+                document.getElementById('habitStartDate').value = habit.start_date;
+            } else {
+                document.getElementById('habitForm').reset();
+                document.getElementById('habitId').value = '';
+                document.getElementById('habitStartDate').value = new Date().toISOString().split('T')[0];
+                document.getElementById('habitColor').value = '#4CAF50';
+            }
+        }
+
+        function hideHabitModal() {
+            document.getElementById('habitModal').classList.add('hidden');
+        }
+
+        document.getElementById('habitForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('habitId').value;
+            const data = {
+                name: document.getElementById('habitName').value,
+                target: document.getElementById('habitTarget').value,
+                frequency: document.getElementById('habitFrequency').value,
+                reminder_time: document.getElementById('habitReminder').value || null,
+                color: document.getElementById('habitColor').value,
+                start_date: document.getElementById('habitStartDate').value
+            };
+            
+            if (id) {
+                await api(`/habits/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+            } else {
+                await api('/habits', { method: 'POST', body: JSON.stringify(data) });
+            }
+            
+            hideHabitModal();
+            loadHabits();
+            loadTodayHabits();
+        });
+
+        async function editHabit(id) {
+            const habits = await api(`/habits?include_archived=true`);
+            const habit = habits.find(h => h.id === id);
+            if (habit) showHabitModal(habit);
+        }
+
+        async function archiveHabit(id) {
+            if (confirm('确定要归档这个习惯吗？')) {
+                await api(`/habits/${id}/archive`, { method: 'POST' });
+                loadHabits();
+                loadTodayHabits();
+            }
+        }
+
+        async function unarchiveHabit(id) {
+            await api(`/habits/${id}/unarchive`, { method: 'POST' });
+            loadHabits();
+        }
+
+        async function deleteHabit(id) {
+            if (confirm('确定要删除这个习惯吗？所有关联的打卡记录也会被删除！')) {
+                await api(`/habits/${id}`, { method: 'DELETE' });
+                loadHabits();
+                loadTodayHabits();
+                loadCalendar();
+                loadStatistics();
+            }
+        }
+
+        async function loadCalendar() {
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth() + 1;
+            document.getElementById('currentMonth').textContent = `${year}年${month}月`;
+            
+            const data = await api(`/checkins/calendar?year=${year}&month=${month}`);
+            const firstDay = new Date(year, month - 1, 1).getDay();
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+            let html = '<div class="grid grid-cols-7 gap-px bg-gray-200">';
+            weekDays.forEach(d => html += `<div class="bg-gray-50 p-2 text-center text-sm font-medium text-gray-700">${d}</div>`);
+            
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div class="bg-white p-2"></div>';
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const checkins = data[day] || [];
+                const isToday = day === new Date().getDate() && month === new Date().getMonth() + 1 && year === new Date().getFullYear();
+                const canCheckin = isToday || (new Date(year, month - 1, day) >= new Date(new Date().setDate(new Date().getDate() - 7)));
+                
+                html += `<div class="bg-white p-2 calendar-day ${isToday ? 'bg-indigo-50' : ''}">
+                    <div class="text-sm font-medium ${isToday ? 'text-indigo-600' : 'text-gray-700'}">${day}</div>
+                    <div class="space-y-1 mt-1">
+                        ${checkins.slice(0, 3).map(c => `<div class="habit-dot" style="background-color: ${c.color}" title="${c.habit_name}: ${c.note || ''}"></div>`).join('')}
+                    </div>
+                    ${canCheckin ? `<button onclick="showMakeupCalendar(${year}, ${month}, ${day})" class="text-xs text-indigo-600 hover:text-indigo-800 mt-1">补卡</button>` : ''}
+                </div>`;
+            }
+            
+            html += '</div>';
+            document.getElementById('calendar').innerHTML = html;
+        }
+
+        function changeMonth(delta) {
+            currentMonth.setMonth(currentMonth.getMonth() + delta);
+            loadCalendar();
+        }
+
+        async function showMakeupCalendar(year, month, day) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const habits = await api('/habits');
+            
+            const habitList = habits.filter(h => !h.is_archived).map(h => `
+                <div class="flex items-center justify-between py-2">
+                    <span class="flex items-center space-x-2">
+                        <span class="habit-dot" style="background-color: ${h.color}"></span>
+                        <span>${h.name}</span>
+                    </span>
+                    <button onclick="checkin(${h.id}, '${dateStr}')" class="text-indigo-600 hover:text-indigo-800">打卡</button>
+                </div>
+            `).join('');
+            
+            const modalHtml = `
+                <div id="makeupModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 class="text-xl font-bold text-gray-900 mb-4">补卡 - ${dateStr}</h3>
+                        <div class="max-h-80 overflow-y-auto">${habitList || '<p class="text-gray-500">暂无习惯</p>'}</div>
+                        <button onclick="document.getElementById('makeupModal').remove()" class="w-full mt-4 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300">关闭</button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        async function loadStatistics() {
+            const streak = await api('/statistics/streak');
+            document.getElementById('currentStreak').textContent = streak.current_streak;
+            document.getElementById('longestStreak').textContent = streak.longest_streak;
+
+            const completion = await api('/statistics/completion');
+            document.getElementById('weeklyRate').textContent = completion.weekly + '%';
+            document.getElementById('weeklyBar').style.width = completion.weekly + '%';
+            document.getElementById('monthlyRate').textContent = completion.monthly + '%';
+            document.getElementById('monthlyBar').style.width = completion.monthly + '%';
+
+            const trendData = await api('/statistics/trend?days=30');
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            if (window.trendChart) window.trendChart.destroy();
+            window.trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trendData.map(d => d.date.slice(5)),
+                    datasets: [{
+                        label: '打卡数',
+                        data: trendData.map(d => d.count),
+                        borderColor: '#4F46E5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            const heatmapData = await api('/statistics/heatmap');
+            renderHeatmap(heatmapData);
+        }
+
+        function renderHeatmap(data) {
+            const container = document.getElementById('heatmap');
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - 364);
+            
+            const weekDays = ['', '一', '', '三', '', '五', ''];
+            let html = '<div class="flex"><div class="flex flex-col text-xs text-gray-500 pr-2">';
+            weekDays.forEach(d => html += `<div class="h-3 mb-1">${d}</div>`);
+            html += '</div><div class="flex">';
+            
+            let currentDate = new Date(startDate);
+            let weekHtml = '';
+            for (let week = 0; week < 53; week++) {
+                weekHtml = '<div class="flex flex-col space-y-1">';
+                for (let day = 0; day < 7; day++) {
+                    if (currentDate > today) break;
+                    const dateStr = currentDate.toISOString().split('T')[0];
+                    const count = data[dateStr] || 0;
+                    const level = Math.min(count, 4);
+                    weekHtml += `<div class="heatmap-cell heatmap-level-${level}" title="${dateStr}: ${count}次打卡"></div>`;
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                weekHtml += '</div>';
+                html += weekHtml;
+            }
+            
+            html += '</div></div>';
+            html += '<div class="flex items-center justify-end mt-4 space-x-2 text-xs text-gray-500">';
+            html += '<span>少</span>';
+            for (let i = 0; i <= 4; i++) {
+                html += `<div class="heatmap-cell heatmap-level-${i}"></div>`;
+            }
+            html += '<span>多</span></div>';
+            
+            container.innerHTML = html;
+        }
+
+        function initDateSelects() {
+            const yearSelect = document.getElementById('reportYear');
+            const monthSelect = document.getElementById('reportMonth');
+            const now = new Date();
+            
+            for (let y = now.getFullYear() - 2; y <= now.getFullYear(); y++) {
+                yearSelect.innerHTML += `<option value="${y}" ${y === now.getFullYear() ? 'selected' : ''}>${y}</option>`;
+            }
+            for (let m = 1; m <= 12; m++) {
+                monthSelect.innerHTML += `<option value="${m}" ${m === now.getMonth() + 1 ? 'selected' : ''}>${m}月</option>`;
+            }
+        }
+
+        async function exportData() {
+            const res = await api('/data/export');
+            window.open('/data/export', '_blank');
+        }
+
+        document.getElementById('importFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const res = await api('/data/import', {
+                method: 'POST',
+                body: formData,
+                headers: {}
+            });
+            
+            alert(res.message || '导入成功');
+            loadHabits();
+            loadCalendar();
+            loadStatistics();
+            e.target.value = '';
+        });
+
+        async function exportPDF() {
+            const year = document.getElementById('reportYear').value;
+            const month = document.getElementById('reportMonth').value;
+            window.open(`/data/report/pdf?year=${year}&month=${month}`, '_blank');
+        }
+
+        async function loadGroups() {
+            const groups = await api('/groups');
+            const container = document.getElementById('groupsList');
+            container.innerHTML = groups.map(g => `
+                <div class="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md" onclick="openGroup(${g.id}, '${g.name}', '${g.description || ''}')">
+                    <h4 class="font-medium text-gray-900">${g.name}</h4>
+                    <p class="text-sm text-gray-500">${g.description || '暂无描述'}</p>
+                    <p class="text-xs text-gray-400 mt-2">创建者: ${g.creator_name}</p>
+                </div>
+            `).join('') || '<p class="text-gray-500">暂无小组，快去创建吧！</p>';
+        }
+
+        function showGroupModal() {
+            document.getElementById('groupModal').classList.remove('hidden');
+        }
+
+        function hideGroupModal() {
+            document.getElementById('groupModal').classList.add('hidden');
+        }
+
+        document.getElementById('groupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('groupNameInput').value,
+                description: document.getElementById('groupDescInput').value
+            };
+            await api('/groups', { method: 'POST', body: JSON.stringify(data) });
+            hideGroupModal();
+            loadGroups();
+        });
+
+        function openGroup(id, name, desc) {
+            currentGroupId = id;
+            document.getElementById('groupName').textContent = name;
+            document.getElementById('groupDesc').textContent = desc || '暂无描述';
+            document.getElementById('groupsList').classList.add('hidden');
+            document.getElementById('groupDetail').classList.remove('hidden');
+            loadLeaderboard();
+            loadMessages();
+        }
+
+        async function loadLeaderboard() {
+            const data = await api(`/groups/${currentGroupId}/leaderboard`);
+            const container = document.getElementById('leaderboard');
+            container.innerHTML = data.map((u, i) => `
+                <div class="flex items-center justify-between p-2 ${i < 3 ? 'bg-yellow-50' : ''} rounded">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 flex items-center justify-center rounded-full ${i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-300' : i === 2 ? 'bg-orange-300' : 'bg-gray-100'} text-sm font-medium">${i + 1}</span>
+                        <span class="font-medium">${u.nickname || u.username}</span>
+                    </div>
+                    <span class="text-indigo-600 font-medium">${u.checkin_count}次</span>
+                </div>
+            `).join('') || '<p class="text-gray-500">暂无数据</p>';
+        }
+
+        async function loadMessages() {
+            const messages = await api(`/groups/${currentGroupId}/messages`);
+            const container = document.getElementById('messageBoard');
+            container.innerHTML = messages.map(m => `
+                <div class="bg-gray-50 p-3 rounded-lg">
+                    <div class="flex justify-between">
+                        <span class="font-medium text-gray-900">${m.username}</span>
+                        <span class="text-xs text-gray-400">${new Date(m.created_at).toLocaleString()}</span>
+                    </div>
+                    <p class="text-gray-700 mt-1">${m.content}</p>
+                </div>
+            `).join('') || '<p class="text-gray-500">暂无留言</p>';
+        }
+
+        async function postMessage() {
+            const input = document.getElementById('messageInput');
+            if (!input.value.trim()) return;
+            
+            await api(`/groups/${currentGroupId}/messages`, {
+                method: 'POST',
+                body: JSON.stringify({ content: input.value })
+            });
+            
+            input.value = '';
+            loadMessages();
+        }
+
+        function showInviteModal() {
+            document.getElementById('inviteModal').classList.remove('hidden');
+        }
+
+        function hideInviteModal() {
+            document.getElementById('inviteModal').classList.add('hidden');
+        }
+
+        async function inviteMember() {
+            const username = document.getElementById('inviteUsername').value;
+            if (!username) return;
+            
+            const res = await api(`/groups/${currentGroupId}/invite?username=${encodeURIComponent(username)}`, { method: 'POST' });
+            alert(res.message || '邀请成功');
+            hideInviteModal();
+        }
+
+        document.getElementById('avatarInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const res = await api('/users/me/avatar', {
+                method: 'POST',
+                body: formData,
+                headers: {}
+            });
+            
+            document.getElementById('avatarPreview').src = `/static/avatars/${res.avatar}?t=${Date.now()}`;
+            currentUser.avatar = res.avatar;
+        });
+
+        async function updateProfile() {
+            const data = {
+                nickname: document.getElementById('profileNickname').value,
+                bio: document.getElementById('profileBio').value,
+                webhook_url: document.getElementById('profileWebhook').value,
+                webhook_type: document.getElementById('profileWebhookType').value
+            };
+            
+            await api('/users/me', { method: 'PUT', body: JSON.stringify(data) });
+            alert('保存成功');
+            loadUser();
+        }
+
+        async function confirmDeleteAccount() {
+            if (confirm('确定要注销账户吗？账户将在30天后永久删除，期间可以通过重新登录恢复。')) {
+                await api('/users/me', { method: 'DELETE' });
+                logout();
+            }
+        }
+
+        if (token) {
+            loadUser().catch(() => {
+                localStorage.removeItem('token');
+                token = null;
+            });
+        }
+    </script>
+</body>
+</html>
