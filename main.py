@@ -637,13 +637,13 @@ def get_trend_data(
     result = []
     for i in range(days):
         d = start_date + timedelta(days=i)
-        count = db.query(Checkin).filter(
+        checked_habits = db.query(Checkin.habit_id).filter(
             Checkin.habit_id.in_(habit_ids),
             Checkin.checkin_date == d
-        ).count()
+        ).distinct().count()
         total = len(habits)
-        completion_rate = round((count / total * 100) if total > 0 else 0, 1)
-        result.append({"date": str(d), "count": count, "total": total, "rate": completion_rate})
+        completion_rate = round((checked_habits / total * 100) if total > 0 else 0, 1)
+        result.append({"date": str(d), "count": checked_habits, "total": total, "rate": completion_rate})
     
     return result
 

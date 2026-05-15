@@ -12,12 +12,6 @@
         .page.active { display: block; }
         .habit-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
         .calendar-day { min-height: 80px; }
-        .heatmap-cell { width: 12px; height: 12px; border-radius: 2px; }
-        .heatmap-level-0 { background: #ebedf0; }
-        .heatmap-level-1 { background: #9be9a8; }
-        .heatmap-level-2 { background: #40c463; }
-        .heatmap-level-3 { background: #30a14e; }
-        .heatmap-level-4 { background: #216e39; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -495,6 +489,13 @@
             initDateSelects();
         }
 
+        function getLocalDateStr(date = new Date()) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
         function logout() {
             localStorage.removeItem('token');
             token = null;
@@ -528,7 +529,7 @@
                             <p class="text-sm text-gray-500">${h.habit.target}</p>
                         </div>
                     </div>
-                    <button onclick="checkin(${h.habit.id}, '${new Date().toISOString().split('T')[0]}')" 
+                    <button onclick="checkin(${h.habit.id}, getLocalDateStr())" 
                         class="px-4 py-2 rounded-md ${h.checked ? 'bg-green-100 text-green-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}">
                         ${h.checked ? '✓ 已完成' : '打卡'}
                     </button>
@@ -629,7 +630,7 @@
             } else {
                 document.getElementById('habitForm').reset();
                 document.getElementById('habitId').value = '';
-                document.getElementById('habitStartDate').value = new Date().toISOString().split('T')[0];
+                document.getElementById('habitStartDate').value = getLocalDateStr();
                 document.getElementById('habitColor').value = '#4CAF50';
                 document.getElementById('habitIcon').value = '🌱';
                 const defaultBtn = document.querySelector('.icon-btn[data-icon="🌱"]');
@@ -842,7 +843,7 @@
             for (let week = 0; week < 53; week++) {
                 for (let day = 0; day < 7; day++) {
                     if (currentDate > today) break;
-                    const dateStr = currentDate.toISOString().split('T')[0];
+                    const dateStr = getLocalDateStr(currentDate);
                     const count = data[dateStr] || 0;
                     const level = Math.min(count, 4);
                     

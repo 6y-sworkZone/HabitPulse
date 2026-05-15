@@ -1,7 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import requests
-from database import SessionLocal, Habit, User, ReminderLog, Checkin
+from database import SessionLocal, Habit, User, ReminderLog, Checkin, HabitGroup, GroupMember, GroupMessage
 
 scheduler = BackgroundScheduler()
 
@@ -15,6 +15,9 @@ def cleanup_deleted_users():
         ).all()
         
         for user in deleted_users:
+            db.query(GroupMessage).filter(GroupMessage.user_id == user.id).delete()
+            db.query(GroupMember).filter(GroupMember.user_id == user.id).delete()
+            db.query(HabitGroup).filter(HabitGroup.creator_id == user.id).delete()
             db.query(Checkin).filter(Checkin.user_id == user.id).delete()
             db.query(ReminderLog).filter(ReminderLog.user_id == user.id).delete()
             db.query(Habit).filter(Habit.user_id == user.id).delete()
